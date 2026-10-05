@@ -80,7 +80,6 @@ const tx = async (m, f) => { const d = await db; return new Promise((ok, no) => 
 const put = (k, v) => tx('readwrite', s => s.put(v, k));
 const keys = () => tx('readonly', s => s.getAllKeys());
 const get = k => tx('readonly', s => s.get(k));
-// NUEVA FUNCIÓN: Para borrar de la base de datos local y evitar que se sature
 const del = k => tx('readwrite', s => s.delete(k));
 
 // ---- ZIP sin dependencias ----
@@ -239,24 +238,19 @@ cam.onchange = () => { const f = cam.files[0]; cam.value = ''; if (f) { R.pend =
 async function fin() {
   app.innerHTML = '<h2>Creando ZIP Individual…</h2><small>Por favor espera un momento.</small>';
   
-  // 1. Calculamos el nombre exacto de la carpeta de ESTA persona
   const baseName = `${R.nivel}_${R.curp}_${clean(S.entrega)}_${clean(S.capturista)}`;
   const prefix = `${nombreSes()}/${baseName}/`;
-  
-  // 2. Traemos de la base de datos SOLO los archivos que coincidan con esta persona
   const ks = (await keys()).filter(k => k.startsWith(prefix));
   const files = [];
   
   for (const k of ks) {
-    // Agregamos al ZIP
     files.push({ name: k, data: new Uint8Array(await (await get(k)).arrayBuffer()) });
-    // ¡LA MAGIA AQUÍ! Borramos la foto de la memoria/disco para no acumular basura.
     await del(k); 
   }
   
-  // 3. Nombramos el archivo ZIP con el nombre de esta persona
   const fn = baseName + '.zip';
-  const blob = zip(files), file = new File([blob], fn, { type: 'application/zip' }), url = URL.createObjectURL(blob);
+  // Se añade lastModified para mejor compatibilidad móvil
+  const blob = zip(files), file = new File([blob], fn, { type: 'application/zip', lastModified: Date.now() }), url = URL.createObjectURL(blob);
   
   app.innerHTML = `<h2>¡Proceso Completo! 🎉</h2>
   <div class="info-card" style="margin-top:10px;">
@@ -268,10 +262,30 @@ async function fin() {
   <a href="${url}" download="${fn}"><button class="o" style="width:100%">⬇️ DESCARGAR ZIP</button></a>
   <br>${btn('sig', 'SIGUIENTE PERSONA')}`;
   
-  // Auto-descarga
+  // Auto-descarga por defecto
   const a = document.createElement('a'); a.href = url; a.download = fn; document.body.appendChild(a); a.click(); a.remove();
   
-  on('sh', async () => { try { if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: fn }); else alert('Tu navegador no soporta compartir directamente. Usa el botón de Descargar.'); } catch (e) {} });
+  // NUEVA LÓGICA DE COMPARTIR MEJORADA Y A PRUEBA DE FALLOS
+  on('sh', async () => { 
+    try { 
+      if (!navigator.share) {
+        alert('Tu navegador no tiene la función de compartir activada. Esto ocurre si abres el archivo localmente o no usas HTTPS. Usa el botón de DESCARGAR ZIP.');
+        return;
+      }
+      
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: fn, text: 'Adjunto el archivo ZIP de la captura.' }); 
+      } else { 
+        alert('Tu celular restringe compartir archivos ZIP directamente desde el navegador. Por favor, DESCARGA el ZIP y compártelo desde tu carpeta de Descargas.'); 
+      } 
+    } catch (e) { 
+      // Si el error no fue simplemente "el usuario canceló"
+      if (e.name !== 'AbortError') {
+        alert('Error al intentar compartir: ' + e.message + '. Por favor usa el botón de Descargar.');
+      }
+    } 
+  });
+  
   on('sig', nivel);
 }
 
