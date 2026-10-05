@@ -1,104 +1,306 @@
-<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#1565c0"><link rel="manifest" href="manifest.json"><link rel="icon" href="icon.svg">
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover">
+<meta name="theme-color" content="#0062ff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
 <title>Captura Fotos</title>
 <style>
-body{font-family:system-ui,sans-serif;margin:0;padding:16px;max-width:520px;margin:auto}
-h2{margin:8px 0}button,input{width:100%;box-sizing:border-box;font-size:18px;padding:14px;margin:6px 0;border-radius:10px}
-button{background:#1565c0;color:#fff;border:0}button.o{background:#fff;color:#1565c0;border:2px solid #1565c0}
-button:disabled{opacity:.4}input{border:2px solid #999}small{color:#555}img,video{width:100%;border-radius:10px;background:#000}
-</style></head><body><div id="app"></div>
+  :root {
+    --primary: #0062ff;
+    --primary-hover: #0056e0;
+    --bg: #f2f4f7;
+    --surface: #ffffff;
+    --text: #111827;
+    --text-sec: #6b7280;
+    --border: #e5e7eb;
+    --radius: 16px;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    touch-action: manipulation;
+  }
+  #app {
+    background: var(--surface);
+    width: 100%;
+    max-width: 480px;
+    padding: 24px;
+    border-radius: var(--radius);
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    margin-top: 10px;
+  }
+  h2 { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: var(--text); }
+  h3 { margin: 16px 0 12px 0; font-size: 16px; font-weight: 600; color: var(--text-sec); }
+  p, small { color: var(--text-sec); font-size: 14px; margin: 4px 0; line-height: 1.4; display: block; }
+  
+  .input-group { margin-bottom: 12px; }
+  .input-group small { margin-bottom: 6px; font-weight: 500; color: var(--text); }
+  input {
+    width: 100%; box-sizing: border-box;
+    font-size: 16px; padding: 14px 16px;
+    border-radius: 12px; border: 2px solid var(--border);
+    background: #f9fafb; color: var(--text);
+    transition: all 0.2s ease;
+    appearance: none;
+  }
+  input:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(0, 98, 255, 0.1);
+  }
+  
+  button {
+    width: 100%; box-sizing: border-box;
+    font-size: 16px; font-weight: 600; padding: 16px; margin-bottom: 12px;
+    border-radius: 12px; border: none;
+    background: var(--primary); color: #fff;
+    cursor: pointer; transition: transform 0.1s, opacity 0.2s;
+    display: flex; justify-content: center; align-items: center; gap: 8px;
+  }
+  button.o {
+    background: transparent; color: var(--primary);
+    border: 2px solid var(--primary);
+  }
+  button:active:not(:disabled) { transform: scale(0.97); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  
+  img, video {
+    width: 100%; border-radius: 12px;
+    background: #000; margin-bottom: 16px;
+    aspect-ratio: 4/3; object-fit: cover;
+  }
+  
+  .info-card {
+    background: #f8fafc; border: 1px solid var(--border);
+    padding: 16px; border-radius: 12px; margin-bottom: 20px;
+  }
+  .info-card h2 { margin: 0 0 8px 0; font-size: 18px; color: var(--primary); }
+  .info-card p { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+  
+  .badge-container { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .badge {
+    background: #e0e7ff; color: #3730a3; font-size: 13px;
+    font-weight: 600; padding: 6px 12px; border-radius: 20px;
+  }
+  
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-2 button { margin-bottom: 0; }
+  a { text-decoration: none; }
+</style>
+</head>
+<body>
+<div id="app"></div>
 <input type="file" id="cam" accept="image/*" capture="environment" hidden>
+
 <script>
-const $=s=>document.querySelector(s),app=$('#app'),cam=$('#cam');
-const today=()=>new Date().toLocaleDateString('sv');
-const clean=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'')||'SN';
-const RX=/[A-Z]{4}[0-9]{6}[HM][A-Z]{5}[A-Z0-9][0-9]/;
-const PASOS=[['INE_FRENTE','FRENTE del INE'],['INE_REVERSO','REVERSO del INE'],['CONTRATO','CONTRATO completo'],['ENTREGA','ENTREGA'],['CURP','CURP']];
-const pasos=n=>n=='EMS'?PASOS:PASOS.slice(0,4);
+const $ = s => document.querySelector(s), app = $('#app'), cam = $('#cam');
+const today = () => new Date().toLocaleDateString('sv');
+const clean = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '') || 'SN';
+const RX = /[A-Z]{4}[0-9]{6}[HM][A-Z]{5}[A-Z0-9][0-9]/;
+const PASOS = [['INE_FRENTE', 'FRENTE del INE'], ['INE_REVERSO', 'REVERSO del INE'], ['CONTRATO', 'CONTRATO completo'], ['ENTREGA', 'ENTREGA'], ['CURP', 'CURP']];
+const pasos = n => n == 'EMS' ? PASOS : PASOS.slice(0, 4);
 
 // ---- almacenamiento (IndexedDB) ----
-const db=new Promise((ok,no)=>{const r=indexedDB.open('captura',1);r.onupgradeneeded=()=>r.result.createObjectStore('f');r.onsuccess=()=>ok(r.result);r.onerror=no});
-const tx=async(m,f)=>{const d=await db;return new Promise((ok,no)=>{const t=d.transaction('f',m),q=f(t.objectStore('f'));t.oncomplete=()=>ok(q&&q.result);t.onerror=no})};
-const put=(k,v)=>tx('readwrite',s=>s.put(v,k)),keys=()=>tx('readonly',s=>s.getAllKeys()),get=k=>tx('readonly',s=>s.get(k));
+const db = new Promise((ok, no) => { const r = indexedDB.open('captura', 1); r.onupgradeneeded = () => r.result.createObjectStore('f'); r.onsuccess = () => ok(r.result); r.onerror = no; });
+const tx = async (m, f) => { const d = await db; return new Promise((ok, no) => { const t = d.transaction('f', m), q = f(t.objectStore('f')); t.oncomplete = () => ok(q && q.result); t.onerror = no; }); };
+const put = (k, v) => tx('readwrite', s => s.put(v, k)), keys = () => tx('readonly', s => s.getAllKeys()), get = k => tx('readonly', s => s.get(k));
 
-// ---- ZIP sin dependencias (sin compresión; el JPG ya viene comprimido) ----
-const CT=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
-const crc=u=>{let c=~0;for(const b of u)c=CT[(c^b)&255]^(c>>>8);return ~c>>>0};
-function zip(files){const enc=new TextEncoder(),parts=[],cd=[];let off=0;const d=new Date();
- const dt=((d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1)),dd=(((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate());
- for(const f of files){const n=enc.encode(f.name),c=crc(f.data),s=f.data.length;
-  const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x800,true);h.setUint16(10,dt,true);h.setUint16(12,dd,true);h.setUint32(14,c,true);h.setUint32(18,s,true);h.setUint32(22,s,true);h.setUint16(26,n.length,true);
-  parts.push(h,n,f.data);
-  const e=new DataView(new ArrayBuffer(46));e.setUint32(0,0x02014b50,true);e.setUint16(4,20,true);e.setUint16(6,20,true);e.setUint16(8,0x800,true);e.setUint16(12,dt,true);e.setUint16(14,dd,true);e.setUint32(16,c,true);e.setUint32(20,s,true);e.setUint32(24,s,true);e.setUint16(28,n.length,true);e.setUint32(42,off,true);
-  cd.push(e,n);off+=30+n.length+s}
- let cs=0;cd.forEach(x=>cs+=x.byteLength||x.length);
- const z=new DataView(new ArrayBuffer(22));z.setUint32(0,0x06054b50,true);z.setUint16(8,files.length,true);z.setUint16(10,files.length,true);z.setUint32(12,cs,true);z.setUint32(16,off,true);
- return new Blob([...parts,...cd,z],{type:'application/zip'})}
+// ---- ZIP sin dependencias ----
+const CT = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc = u => { let c = ~0; for (const b of u) c = CT[(c ^ b) & 255] ^ (c >>> 8); return ~c >>> 0; };
+function zip(files) {
+  const enc = new TextEncoder(), parts = [], cd = []; let off = 0; const d = new Date();
+  const dt = ((d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1)), dd = (((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate());
+  for (const f of files) {
+    const n = enc.encode(f.name), c = crc(f.data), s = f.data.length;
+    const h = new DataView(new ArrayBuffer(30)); h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x800, true); h.setUint16(10, dt, true); h.setUint16(12, dd, true); h.setUint32(14, c, true); h.setUint32(18, s, true); h.setUint32(22, s, true); h.setUint16(26, n.length, true);
+    parts.push(h, n, f.data);
+    const e = new DataView(new ArrayBuffer(46)); e.setUint32(0, 0x02014b50, true); e.setUint16(4, 20, true); e.setUint16(6, 20, true); e.setUint16(8, 0x800, true); e.setUint16(12, dt, true); e.setUint16(14, dd, true); e.setUint32(16, c, true); e.setUint32(20, s, true); e.setUint32(24, s, true); e.setUint16(28, n.length, true); e.setUint32(42, off, true);
+    cd.push(e, n); off += 30 + n.length + s;
+  }
+  let cs = 0; cd.forEach(x => cs += x.byteLength || x.length);
+  const z = new DataView(new ArrayBuffer(22)); z.setUint32(0, 0x06054b50, true); z.setUint16(8, files.length, true); z.setUint16(10, files.length, true); z.setUint32(12, cs, true); z.setUint32(16, off, true);
+  return new Blob([...parts, ...cd, z], { type: 'application/zip' });
+}
 
 // ---- estado ----
-let S=JSON.parse(localStorage.sesion||'null'),R={nivel:'',curp:'',i:0,pend:null},stream,timer;
-const vigente=()=>S&&S.creadoEl==today();
-const nombreSes=()=>clean(S.sede)+'_'+S.fecha;
-const stopCam=()=>{clearInterval(timer);stream&&stream.getTracks().forEach(t=>t.stop());stream=null};
-const go=(f,...a)=>{stopCam();app.innerHTML='';f(...a)};
-const btn=(id,t,o)=>`<button id="${id}" ${o==='o'?'class="o"':''}>${t}</button>`;
-const on=(id,f)=>$('#'+id).onclick=f;
+let S = JSON.parse(localStorage.sesion || 'null'), R = { nivel: '', curp: '', i: 0, pend: null }, stream, timer;
+const vigente = () => S && S.creadoEl == today();
+const nombreSes = () => clean(S.sede) + '_' + S.fecha;
+const stopCam = () => { clearInterval(timer); stream && stream.getTracks().forEach(t => t.stop()); stream = null; };
+const go = (f, ...a) => { stopCam(); app.innerHTML = ''; f(...a); };
+const btn = (id, t, o) => `<button id="${id}" ${o === 'o' ? 'class="o"' : ''}>${t}</button>`;
+const on = (id, f) => $('#' + id).onclick = f;
 
-function setup(){app.innerHTML=`<h2>${vigente()?'Editar datos':'Datos del día'}</h2>
-<input id="sede" placeholder="Sede (nombre de la carpeta)" value="${S?.sede||''}">
-<input id="cap" placeholder="Capturista" value="${S?.capturista||''}">
-<input id="ent" placeholder="Quién entrega" value="${S?.entrega||''}">
-<input id="fec" value="${vigente()?S.fecha:today()}"><small>Fecha (AAAA-MM-DD)</small>${btn('ok',vigente()?'GUARDAR CAMBIOS':'CREAR CARPETA')}${vigente()?btn('cx','Cancelar','o'):''}`;
- if(vigente())on('cx',nivel);
- on('ok',()=>{const v=i=>$('#'+i).value.trim();if(!v('sede')||!v('cap')||!v('ent')||!v('fec'))return alert('Llena todos los campos');
-  S={sede:v('sede'),capturista:v('cap'),entrega:v('ent'),fecha:v('fec'),creadoEl:today()};localStorage.sesion=JSON.stringify(S);nivel()})}
+function setup() {
+  app.innerHTML = `<h2>${vigente() ? 'Editar Configuración' : 'Nueva Sesión'}</h2>
+  <div class="input-group"><small>Sede (nombre de la carpeta)</small><input id="sede" placeholder="Ej. CDMX Centro" value="${S?.sede || ''}"></div>
+  <div class="input-group"><small>Quién entrega</small><input id="ent" placeholder="Ej. Juan Pérez" value="${S?.entrega || ''}"></div>
+  <div class="input-group"><small>Capturista</small><input id="cap" placeholder="Ej. María López" value="${S?.capturista || ''}"></div>
+  <div class="input-group"><small>Fecha de sesión</small><input id="fec" type="date" value="${vigente() ? S.fecha : today()}"></div>
+  <br>${btn('ok', vigente() ? 'GUARDAR CAMBIOS' : 'CREAR CARPETA')}
+  ${vigente() ? btn('cx', 'Cancelar', 'o') : ''}`;
+  
+  if (vigente()) on('cx', nivel);
+  on('ok', () => {
+    const v = i => $('#' + i).value.trim();
+    if (!v('sede') || !v('cap') || !v('ent') || !v('fec')) return alert('Llena todos los campos');
+    S = { sede: v('sede'), capturista: v('cap'), entrega: v('ent'), fecha: v('fec'), creadoEl: today() };
+    localStorage.sesion = JSON.stringify(S); nivel();
+  });
+}
 
-function nivel(){R={nivel:'',curp:'',i:0,pend:null};
- app.innerHTML=`<h2>Sede: ${S.sede}</h2><small>${S.fecha} · Capturista: ${S.capturista} · Entrega: ${S.entrega}</small>
-<h2>Selecciona el nivel</h2>${['BASICA','EMS','JEF'].map(n=>btn('n'+n,n)).join('')}<br><br>${btn('nuevo','EDITAR DATOS / NUEVA CARPETA','o')}`;
- ['BASICA','EMS','JEF'].forEach(n=>on('n'+n,()=>{R.nivel=n;eleccion()}));
- on('nuevo',setup)}
+function nivel() {
+  R = { nivel: '', curp: '', i: 0, pend: null };
+  app.innerHTML = `<div class="info-card">
+    <h2>📍 Sede: ${S.sede}</h2>
+    <p><span>👤 Capturista: <b>${S.capturista}</b></span><span>📦 Entrega: <b>${S.entrega}</b></span><span>📅 Fecha: ${S.fecha}</span></p>
+  </div>
+  <h3>Selecciona el nivel educativo</h3>
+  ${['BASICA', 'EMS', 'JEF'].map(n => btn('n' + n, n)).join('')}<br>
+  ${btn('nuevo', 'EDITAR DATOS / NUEVA SESIÓN', 'o')}`;
+  
+  ['BASICA', 'EMS', 'JEF'].forEach(n => on('n' + n, () => { R.nivel = n; eleccion(); }));
+  on('nuevo', setup);
+}
 
-function eleccion(){app.innerHTML=`<h2>Nivel: ${R.nivel}</h2><h2>¿Cómo ingresas la CURP?</h2>${btn('man','MANUAL')}${btn('esc','ESCANEAR (QR / código de barras)')}${btn('atr','Cambiar nivel','o')}`;
- on('man',()=>{R.curp='';manual()});on('esc',escanear);on('atr',nivel)}
+function eleccion() {
+  app.innerHTML = `<h2>Nivel: ${R.nivel}</h2><h3>¿Cómo vas a ingresar la CURP?</h3>
+  ${btn('man', '✍️ INGRESO MANUAL')}
+  ${btn('esc', '📷 ESCANEAR (QR / Código)')}
+  <br>${btn('atr', 'Cambiar nivel', 'o')}`;
+  on('man', () => { R.curp = ''; manual(); }); on('esc', escanear); on('atr', nivel);
+}
 
-function manual(){app.innerHTML=`<h2>CURP (18 caracteres)</h2><input id="c" maxlength="18" autocapitalize="characters" autocomplete="off" value="${R.curp}"><small id="n"></small>${btn('go','CONTINUAR A FOTOS')}${btn('atr','Atrás','o')}`;
- const c=$('#c'),u=()=>{c.value=c.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,18);R.curp=c.value;$('#n').textContent=c.value.length+'/18';$('#go').disabled=c.value.length!=18};
- c.oninput=u;u();on('go',()=>{R.i=0;foto()});on('atr',eleccion)}
+function manual() {
+  app.innerHTML = `<h2>Escribe la CURP</h2>
+  <div class="input-group"><small id="n">0/18 caracteres</small>
+  <input id="c" maxlength="18" autocapitalize="characters" autocomplete="off" placeholder="Ingresa los 18 caracteres" value="${R.curp}"></div>
+  ${btn('go', 'CONTINUAR A FOTOS')}
+  ${btn('atr', 'Atrás', 'o')}`;
+  
+  const c = $('#c'), u = () => { 
+    c.value = c.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 18); 
+    R.curp = c.value; $('#n').textContent = c.value.length + '/18 caracteres'; 
+    $('#go').disabled = c.value.length != 18; 
+  };
+  c.oninput = u; u(); on('go', () => { R.i = 0; foto(); }); on('atr', eleccion);
+}
 
-async function escanear(){
- if(!('BarcodeDetector' in window)){alert('Este navegador no tiene escáner. Usa Chrome en Android o captura manual.');return manual()}
- if(!navigator.mediaDevices)return fotoQR();
- app.innerHTML=`<h2>Apunta al QR / código de barras</h2><video id="v" playsinline muted></video><small id="raw"></small>${btn('atr','Cancelar','o')}`;on('atr',eleccion);
- try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});const v=$('#v');v.srcObject=stream;await v.play();
-  const det=new BarcodeDetector();timer=setInterval(async()=>{try{for(const b of await det.detect(v)){const raw=(b.rawValue||'').toUpperCase();$('#raw').textContent='Leído: '+raw.slice(0,50);
-   const m=RX.exec(raw);if(m){R.curp=m[0];navigator.vibrate&&navigator.vibrate(100);return go(manual)}}}catch(e){}},300)}
- catch(e){fotoQR()}}
-function fotoQR(){app.innerHTML=`<h2>Escanear con foto</h2><small>Toma una foto clara del QR o código de barras.</small>${btn('t','📷 TOMAR FOTO DEL CÓDIGO')}${btn('atr','Atrás','o')}`;on('atr',eleccion);on('t',()=>{qr.click()})}
-const qr=document.createElement('input');qr.type='file';qr.accept='image/*';qr.setAttribute('capture','environment');
-qr.onchange=async()=>{const f=qr.files[0];qr.value='';if(!f)return;try{const bm=await createImageBitmap(f);let m=null;for(const b of await new BarcodeDetector().detect(bm)){m=RX.exec((b.rawValue||'').toUpperCase());if(m)break}
- if(m){R.curp=m[0];manual()}else alert('No se encontró una CURP. Intenta de nuevo o captura manual.')}catch(e){alert('No se pudo leer. Captura manual.');manual()}};
+async function escanear() {
+  if (!('BarcodeDetector' in window)) { alert('Este navegador no tiene escáner automático. Usa captura manual o foto.'); return manual(); }
+  if (!navigator.mediaDevices) return fotoQR();
+  
+  app.innerHTML = `<h2>Apunta al código</h2>
+  <video id="v" playsinline muted></video><small id="raw" style="text-align:center; display:block; margin-bottom:16px;">Buscando código...</small>
+  ${btn('atr', 'Cancelar', 'o')}`;
+  on('atr', eleccion);
+  
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const v = $('#v'); v.srcObject = stream; await v.play();
+    const det = new BarcodeDetector();
+    timer = setInterval(async () => {
+      try {
+        for (const b of await det.detect(v)) {
+          const raw = (b.rawValue || '').toUpperCase(); $('#raw').textContent = 'Leído: ' + raw.slice(0, 50);
+          const m = RX.exec(raw); if (m) { R.curp = m[0]; navigator.vibrate && navigator.vibrate(100); return go(manual); }
+        }
+      } catch (e) {}
+    }, 300);
+  } catch (e) { fotoQR(); }
+}
 
-function foto(){const ps=pasos(R.nivel),p=ps[R.i];
- app.innerHTML=`<small>${R.nivel} · ${R.curp} · Paso ${R.i+1}/${ps.length}</small><h2>Toma foto del ${p[1]}</h2>
-${R.pend?`<img src="${R.pend.url}">${btn('ac',R.i+1<ps.length?'ACEPTAR Y SIGUIENTE':'ACEPTAR Y FINALIZAR')}${btn('rep','Repetir foto','o')}`:btn('tom','📷 TOMAR FOTO')}`;
- if(!R.pend)on('tom',()=>cam.click());
- else{on('rep',()=>{URL.revokeObjectURL(R.pend.url);R.pend=null;foto()});
-  on('ac',async()=>{const name=`${nombreSes()}/${R.nivel}_${R.curp}/${R.nivel}_${R.curp}_${clean(S.capturista)}_${p[0]}.jpg`;
-   await put(name,R.pend.blob);R.pend=null;if(R.i+1<ps.length){R.i++;foto()}else fin()})}}
-cam.onchange=()=>{const f=cam.files[0];cam.value='';if(f){R.pend={blob:f,url:URL.createObjectURL(f)};foto()}};
+function fotoQR() {
+  app.innerHTML = `<h2>Escanear con foto</h2><small>Toma una foto clara del QR o código de barras.</small>
+  ${btn('t', '📷 TOMAR FOTO DEL CÓDIGO')}
+  ${btn('atr', 'Atrás', 'o')}`;
+  on('atr', eleccion); on('t', () => { qr.click(); });
+}
 
-async function fin(){app.innerHTML='<h2>Creando ZIP…</h2>';
- const pre=nombreSes()+'/',ks=(await keys()).filter(k=>k.startsWith(pre)),files=[];
- for(const k of ks)files.push({name:k,data:new Uint8Array(await (await get(k)).arrayBuffer())});
- const blob=zip(files),fn=nombreSes()+'.zip',file=new File([blob],fn,{type:'application/zip'}),url=URL.createObjectURL(blob);
- app.innerHTML=`<h2>¡Entrega completa!</h2><small>El ZIP se descargó automáticamente (revisa Descargas).</small><p>${R.nivel} · ${R.curp}<br><small>${files.length} fotos en el ZIP de hoy: ${fn}</small></p>
-${btn('sh','ENVIAR / COMPARTIR ZIP')}<a href="${url}" download="${fn}"><button class="o">DESCARGAR ZIP</button></a>${btn('sig','SIGUIENTE PERSONA')}`;
- {const a=document.createElement('a');a.href=url;a.download=fn;document.body.appendChild(a);a.click();a.remove()}
- on('sh',async()=>{try{if(navigator.canShare&&navigator.canShare({files:[file]}))await navigator.share({files:[file],title:fn});else alert('Usa DESCARGAR ZIP')}catch(e){}});on('sig',nivel)}
+const qr = document.createElement('input'); qr.type = 'file'; qr.accept = 'image/*'; qr.setAttribute('capture', 'environment');
+qr.onchange = async () => {
+  const f = qr.files[0]; qr.value = ''; if (!f) return;
+  try {
+    const bm = await createImageBitmap(f); let m = null;
+    for (const b of await new BarcodeDetector().detect(bm)) { m = RX.exec((b.rawValue || '').toUpperCase()); if (m) break; }
+    if (m) { R.curp = m[0]; manual(); } else { alert('No se encontró una CURP válida. Intenta de nuevo o hazlo manual.'); manual(); }
+  } catch (e) { alert('No se pudo leer. Intenta con captura manual.'); manual(); }
+};
 
-if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
-navigator.storage&&navigator.storage.persist&&navigator.storage.persist();
-vigente()?nivel():setup();
-</script></body></html>
+function foto() {
+  const ps = pasos(R.nivel), p = ps[R.i];
+  app.innerHTML = `
+  <div class="badge-container">
+    <span class="badge">${R.nivel}</span>
+    <span class="badge">${R.curp}</span>
+    <span class="badge">Paso ${R.i + 1}/${ps.length}</span>
+  </div>
+  <h2>Toma foto del ${p[1]}</h2>
+  ${R.pend ? `<img src="${R.pend.url}">
+    <div class="grid-2">
+      ${btn('rep', '🔄 REPETIR', 'o')}
+      ${btn('ac', R.i + 1 < ps.length ? 'SIGUIENTE ➔' : 'FINALIZAR ✓')}
+    </div>` 
+    : btn('tom', '📷 TOMAR FOTO')}`;
+    
+  if (!R.pend) on('tom', () => cam.click());
+  else {
+    on('rep', () => { URL.revokeObjectURL(R.pend.url); R.pend = null; foto(); });
+    on('ac', async () => {
+      // AQUÍ SE APLICA EL CAMBIO SOLICITADO:
+      // Se genera la subcarpeta y archivo incluyendo: Nivel_Curp_Entrega_Capturista
+      const baseName = `${R.nivel}_${R.curp}_${clean(S.entrega)}_${clean(S.capturista)}`;
+      const fileName = `${baseName}_${p[0]}.jpg`;
+      const name = `${nombreSes()}/${baseName}/${fileName}`;
+      
+      await put(name, R.pend.blob); R.pend = null;
+      if (R.i + 1 < ps.length) { R.i++; foto(); } else fin();
+    });
+  }
+}
+cam.onchange = () => { const f = cam.files[0]; cam.value = ''; if (f) { R.pend = { blob: f, url: URL.createObjectURL(f) }; foto(); } };
+
+async function fin() {
+  app.innerHTML = '<h2>Creando ZIP…</h2><small>Por favor espera un momento.</small>';
+  const pre = nombreSes() + '/', ks = (await keys()).filter(k => k.startsWith(pre)), files = [];
+  for (const k of ks) files.push({ name: k, data: new Uint8Array(await (await get(k)).arrayBuffer()) });
+  const blob = zip(files), fn = nombreSes() + '.zip', file = new File([blob], fn, { type: 'application/zip' }), url = URL.createObjectURL(blob);
+  
+  app.innerHTML = `<h2>¡Proceso Completo! 🎉</h2>
+  <div class="info-card" style="margin-top:10px;">
+    <p><b>${R.nivel}</b> · ${R.curp}</p>
+    <small>📦 Archivos de la sesión de hoy: <b>${files.length} fotos</b> guardadas en ${fn}</small>
+  </div>
+  ${btn('sh', '📤 COMPARTIR ZIP')}
+  <a href="${url}" download="${fn}"><button class="o" style="width:100%">⬇️ DESCARGAR ZIP</button></a>
+  <br>${btn('sig', 'SIGUIENTE PERSONA')}`;
+  
+  // Auto-descarga
+  const a = document.createElement('a'); a.href = url; a.download = fn; document.body.appendChild(a); a.click(); a.remove();
+  
+  on('sh', async () => { try { if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: fn }); else alert('Tu navegador no soporta compartir directamente. Usa el botón de Descargar.'); } catch (e) {} });
+  on('sig', nivel);
+}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+navigator.storage && navigator.storage.persist && navigator.storage.persist();
+vigente() ? nivel() : setup();
+</script>
+</body>
+</html>
