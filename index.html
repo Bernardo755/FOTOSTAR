@@ -27,7 +27,7 @@
     box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); box-sizing: border-box;
     display: flex; flex-direction: column; margin-top: 10px;
   }
-  h2 { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: var(--text); }
+  h2 { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: var(--text); text-align: center; }
   h3 { margin: 16px 0 12px 0; font-size: 16px; font-weight: 600; color: var(--text-sec); }
   p, small { color: var(--text-sec); font-size: 14px; margin: 4px 0; line-height: 1.4; display: block; }
   
@@ -52,14 +52,27 @@
   img, video { width: 100%; border-radius: 12px; background: #000; margin-bottom: 16px; aspect-ratio: 4/3; object-fit: cover; }
   
   .info-card { background: #f8fafc; border: 1px solid var(--border); padding: 16px; border-radius: 12px; margin-bottom: 20px; }
-  .info-card h2 { margin: 0 0 8px 0; font-size: 18px; color: var(--primary); }
+  .info-card h2 { margin: 0 0 8px 0; font-size: 18px; color: var(--primary); text-align: left; }
   .info-card p { margin: 0; display: flex; flex-direction: column; gap: 4px; }
   
-  .badge-container { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .badge-container { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; justify-content: center; }
   .badge { background: #e0e7ff; color: #3730a3; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 20px; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .grid-2 button { margin-bottom: 0; }
   a { text-decoration: none; }
+
+  /* Estilos de la nueva Burbuja Indicadora */
+  .burbuja-container { display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 20px 0; }
+  .burbuja {
+    width: 110px; height: 110px; border-radius: 50%;
+    background: #e0e7ff; color: #3730a3;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    box-shadow: 0 8px 16px rgba(0,98,255,0.15);
+    animation: palpitar 2s infinite; border: 4px solid #fff;
+  }
+  .burbuja-icon { font-size: 42px; line-height: 1; margin-bottom: 4px; }
+  .burbuja-txt { font-size: 12px; font-weight: 800; text-align: center; text-transform: uppercase; line-height: 1.1; padding: 0 5px; }
+  @keyframes palpitar { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 </style>
 </head>
 <body>
@@ -73,6 +86,9 @@ const clean = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCas
 const RX = /[A-Z]{4}[0-9]{6}[HM][A-Z]{5}[A-Z0-9][0-9]/;
 const PASOS = [['INE_FRENTE', 'FRENTE del INE'], ['INE_REVERSO', 'REVERSO del INE'], ['CONTRATO', 'CONTRATO completo'], ['ENTREGA', 'ENTREGA'], ['CURP', 'CURP']];
 const pasos = n => n == 'EMS' ? PASOS : PASOS.slice(0, 4);
+
+// Iconos para la burbuja según el paso
+const ICONOS = { 'INE_FRENTE': '🪪', 'INE_REVERSO': '💳', 'CONTRATO': '📄', 'ENTREGA': '📸', 'CURP': '🖨️' };
 
 // ---- almacenamiento (IndexedDB) ----
 const db = new Promise((ok, no) => { const r = indexedDB.open('captura', 1); r.onupgradeneeded = () => r.result.createObjectStore('f'); r.onsuccess = () => ok(r.result); r.onerror = no; });
@@ -130,10 +146,10 @@ function setup() {
 function nivel() {
   R = { nivel: '', curp: '', i: 0, pend: null };
   app.innerHTML = `<div class="info-card">
-    <h2>📍 Sede: ${S.sede}</h2>
+    <h2 style="text-align:left;">📍 Sede: ${S.sede}</h2>
     <p><span>👤 Capturista: <b>${S.capturista}</b></span><span>📦 Entrega: <b>${S.entrega}</b></span><span>📅 Fecha: ${S.fecha}</span></p>
   </div>
-  <h3>Selecciona el nivel educativo</h3>
+  <h3 style="text-align:center;">Selecciona el nivel educativo</h3>
   ${['BASICA', 'EMS', 'JEF'].map(n => btn('n' + n, n)).join('')}<br>
   ${btn('nuevo', 'EDITAR DATOS / NUEVA SESIÓN', 'o')}`;
   
@@ -142,7 +158,7 @@ function nivel() {
 }
 
 function eleccion() {
-  app.innerHTML = `<h2>Nivel: ${R.nivel}</h2><h3>¿Cómo vas a ingresar la CURP?</h3>
+  app.innerHTML = `<h2>Nivel: ${R.nivel}</h2><h3 style="text-align:center;">¿Cómo vas a ingresar la CURP?</h3>
   ${btn('man', '✍️ INGRESO MANUAL')}
   ${btn('esc', '📷 ESCANEAR (QR / Código)')}
   <br>${btn('atr', 'Cambiar nivel', 'o')}`;
@@ -189,8 +205,8 @@ async function escanear() {
 }
 
 function fotoQR() {
-  app.innerHTML = `<h2>Escanear con foto</h2><small>Toma una foto clara del QR o código de barras.</small>
-  ${btn('t', '📷 TOMAR FOTO DEL CÓDIGO')}
+  app.innerHTML = `<h2>Escanear con foto</h2><small style="text-align:center">Toma una foto clara del QR o código de barras.</small>
+  <br>${btn('t', '📷 TOMAR FOTO DEL CÓDIGO')}
   ${btn('atr', 'Atrás', 'o')}`;
   on('atr', eleccion); on('t', () => { qr.click(); });
 }
@@ -207,91 +223,25 @@ qr.onchange = async () => {
 
 function foto() {
   const ps = pasos(R.nivel), p = ps[R.i];
+  const iconActual = ICONOS[p[0]] || '📷'; // Se obtiene el icono correspondiente
+  
   app.innerHTML = `
   <div class="badge-container">
     <span class="badge">${R.nivel}</span>
-    <span class="badge">${R.curp}</span>
+    <span class="badge">${R.curp.slice(0,6)}...</span>
     <span class="badge">Paso ${R.i + 1}/${ps.length}</span>
   </div>
-  <h2>Toma foto del ${p[1]}</h2>
-  ${R.pend ? `<img src="${R.pend.url}">
+  
+  ${R.pend ? `
+    <h2>Revisa la foto</h2>
+    <img src="${R.pend.url}">
     <div class="grid-2">
       ${btn('rep', '🔄 REPETIR', 'o')}
       ${btn('ac', R.i + 1 < ps.length ? 'SIGUIENTE ➔' : 'FINALIZAR ✓')}
     </div>` 
-    : btn('tom', '📷 TOMAR FOTO')}`;
-    
-  if (!R.pend) on('tom', () => cam.click());
-  else {
-    on('rep', () => { URL.revokeObjectURL(R.pend.url); R.pend = null; foto(); });
-    on('ac', async () => {
-      const baseName = `${R.nivel}_${R.curp}_${clean(S.entrega)}_${clean(S.capturista)}`;
-      const fileName = `${baseName}_${p[0]}.jpg`;
-      const name = `${nombreSes()}/${baseName}/${fileName}`;
-      await put(name, R.pend.blob); R.pend = null;
-      if (R.i + 1 < ps.length) { R.i++; foto(); } else fin();
-    });
-  }
-}
-cam.onchange = () => { const f = cam.files[0]; cam.value = ''; if (f) { R.pend = { blob: f, url: URL.createObjectURL(f) }; foto(); } };
-
-async function fin() {
-  app.innerHTML = '<h2>Creando ZIP Individual…</h2><small>Por favor espera un momento.</small>';
-  
-  const baseName = `${R.nivel}_${R.curp}_${clean(S.entrega)}_${clean(S.capturista)}`;
-  const prefix = `${nombreSes()}/${baseName}/`;
-  const ks = (await keys()).filter(k => k.startsWith(prefix));
-  const files = [];
-  
-  for (const k of ks) {
-    files.push({ name: k, data: new Uint8Array(await (await get(k)).arrayBuffer()) });
-    await del(k); 
-  }
-  
-  const fn = baseName + '.zip';
-  // Se añade lastModified para mejor compatibilidad móvil
-  const blob = zip(files), file = new File([blob], fn, { type: 'application/zip', lastModified: Date.now() }), url = URL.createObjectURL(blob);
-  
-  app.innerHTML = `<h2>¡Proceso Completo! 🎉</h2>
-  <div class="info-card" style="margin-top:10px;">
-    <p><b>${R.nivel}</b> · ${R.curp}</p>
-    <small>📦 Archivo individual generado: <b>${files.length} fotos</b> guardadas en ${fn}</small>
-    <small style="color:green; font-weight:bold; margin-top:5px;">✓ Memoria local liberada</small>
-  </div>
-  ${btn('sh', '📤 COMPARTIR ZIP')}
-  <a href="${url}" download="${fn}"><button class="o" style="width:100%">⬇️ DESCARGAR ZIP</button></a>
-  <br>${btn('sig', 'SIGUIENTE PERSONA')}`;
-  
-  // Auto-descarga por defecto
-  const a = document.createElement('a'); a.href = url; a.download = fn; document.body.appendChild(a); a.click(); a.remove();
-  
-  // NUEVA LÓGICA DE COMPARTIR MEJORADA Y A PRUEBA DE FALLOS
-  on('sh', async () => { 
-    try { 
-      if (!navigator.share) {
-        alert('Tu navegador no tiene la función de compartir activada. Esto ocurre si abres el archivo localmente o no usas HTTPS. Usa el botón de DESCARGAR ZIP.');
-        return;
-      }
-      
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: fn, text: 'Adjunto el archivo ZIP de la captura.' }); 
-      } else { 
-        alert('Tu celular restringe compartir archivos ZIP directamente desde el navegador. Por favor, DESCARGA el ZIP y compártelo desde tu carpeta de Descargas.'); 
-      } 
-    } catch (e) { 
-      // Si el error no fue simplemente "el usuario canceló"
-      if (e.name !== 'AbortError') {
-        alert('Error al intentar compartir: ' + e.message + '. Por favor usa el botón de Descargar.');
-      }
-    } 
-  });
-  
-  on('sig', nivel);
-}
-
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
-navigator.storage && navigator.storage.persist && navigator.storage.persist();
-vigente() ? nivel() : setup();
-</script>
-</body>
-</html>
+  : `
+    <h2>Es turno de:</h2>
+    <div class="burbuja-container">
+      <div class="burbuja">
+        <span class="burbuja-icon">${iconActual}</span>
+        <span class="burbuja-txt">${p[1]}
