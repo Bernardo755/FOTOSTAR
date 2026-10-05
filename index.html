@@ -9,39 +9,23 @@
 <title>Captura Fotos</title>
 <style>
   :root {
-    --primary: #0062ff;
-    --primary-hover: #0056e0;
-    --bg: #f2f4f7;
-    --surface: #ffffff;
-    --text: #111827;
-    --text-sec: #6b7280;
-    --border: #e5e7eb;
-    --radius: 16px;
+    --primary: #0062ff; --primary-hover: #0056e0;
+    --bg: #f2f4f7; --surface: #ffffff;
+    --text: #111827; --text-sec: #6b7280;
+    --border: #e5e7eb; --radius: 16px;
   }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: var(--bg);
-    color: var(--text);
-    margin: 0;
-    padding: 16px;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
-    touch-action: manipulation;
+    background-color: var(--bg); color: var(--text);
+    margin: 0; padding: 16px;
+    display: flex; justify-content: center; align-items: flex-start;
+    min-height: 100vh; touch-action: manipulation;
   }
   #app {
-    background: var(--surface);
-    width: 100%;
-    max-width: 480px;
-    padding: 24px;
-    border-radius: var(--radius);
-    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01);
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    margin-top: 10px;
+    background: var(--surface); width: 100%; max-width: 480px;
+    padding: 24px; border-radius: var(--radius);
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); box-sizing: border-box;
+    display: flex; flex-direction: column; margin-top: 10px;
   }
   h2 { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: var(--text); }
   h3 { margin: 16px 0 12px 0; font-size: 16px; font-weight: 600; color: var(--text-sec); }
@@ -50,54 +34,29 @@
   .input-group { margin-bottom: 12px; }
   .input-group small { margin-bottom: 6px; font-weight: 500; color: var(--text); }
   input {
-    width: 100%; box-sizing: border-box;
-    font-size: 16px; padding: 14px 16px;
+    width: 100%; box-sizing: border-box; font-size: 16px; padding: 14px 16px;
     border-radius: 12px; border: 2px solid var(--border);
-    background: #f9fafb; color: var(--text);
-    transition: all 0.2s ease;
-    appearance: none;
+    background: #f9fafb; color: var(--text); transition: all 0.2s ease; appearance: none;
   }
-  input:focus {
-    outline: none;
-    border-color: var(--primary);
-    background: #fff;
-    box-shadow: 0 0 0 4px rgba(0, 98, 255, 0.1);
-  }
+  input:focus { outline: none; border-color: var(--primary); background: #fff; box-shadow: 0 0 0 4px rgba(0, 98, 255, 0.1); }
   
   button {
-    width: 100%; box-sizing: border-box;
-    font-size: 16px; font-weight: 600; padding: 16px; margin-bottom: 12px;
-    border-radius: 12px; border: none;
-    background: var(--primary); color: #fff;
-    cursor: pointer; transition: transform 0.1s, opacity 0.2s;
-    display: flex; justify-content: center; align-items: center; gap: 8px;
+    width: 100%; box-sizing: border-box; font-size: 16px; font-weight: 600; padding: 16px; margin-bottom: 12px;
+    border-radius: 12px; border: none; background: var(--primary); color: #fff;
+    cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px;
   }
-  button.o {
-    background: transparent; color: var(--primary);
-    border: 2px solid var(--primary);
-  }
+  button.o { background: transparent; color: var(--primary); border: 2px solid var(--primary); }
   button:active:not(:disabled) { transform: scale(0.97); }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button:disabled { opacity: 0.5; }
   
-  img, video {
-    width: 100%; border-radius: 12px;
-    background: #000; margin-bottom: 16px;
-    aspect-ratio: 4/3; object-fit: cover;
-  }
+  img, video { width: 100%; border-radius: 12px; background: #000; margin-bottom: 16px; aspect-ratio: 4/3; object-fit: cover; }
   
-  .info-card {
-    background: #f8fafc; border: 1px solid var(--border);
-    padding: 16px; border-radius: 12px; margin-bottom: 20px;
-  }
+  .info-card { background: #f8fafc; border: 1px solid var(--border); padding: 16px; border-radius: 12px; margin-bottom: 20px; }
   .info-card h2 { margin: 0 0 8px 0; font-size: 18px; color: var(--primary); }
   .info-card p { margin: 0; display: flex; flex-direction: column; gap: 4px; }
   
   .badge-container { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-  .badge {
-    background: #e0e7ff; color: #3730a3; font-size: 13px;
-    font-weight: 600; padding: 6px 12px; border-radius: 20px;
-  }
-  
+  .badge { background: #e0e7ff; color: #3730a3; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 20px; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .grid-2 button { margin-bottom: 0; }
   a { text-decoration: none; }
@@ -118,7 +77,11 @@ const pasos = n => n == 'EMS' ? PASOS : PASOS.slice(0, 4);
 // ---- almacenamiento (IndexedDB) ----
 const db = new Promise((ok, no) => { const r = indexedDB.open('captura', 1); r.onupgradeneeded = () => r.result.createObjectStore('f'); r.onsuccess = () => ok(r.result); r.onerror = no; });
 const tx = async (m, f) => { const d = await db; return new Promise((ok, no) => { const t = d.transaction('f', m), q = f(t.objectStore('f')); t.oncomplete = () => ok(q && q.result); t.onerror = no; }); };
-const put = (k, v) => tx('readwrite', s => s.put(v, k)), keys = () => tx('readonly', s => s.getAllKeys()), get = k => tx('readonly', s => s.get(k));
+const put = (k, v) => tx('readwrite', s => s.put(v, k));
+const keys = () => tx('readonly', s => s.getAllKeys());
+const get = k => tx('readonly', s => s.get(k));
+// NUEVA FUNCIÓN: Para borrar de la base de datos local y evitar que se sature
+const del = k => tx('readwrite', s => s.delete(k));
 
 // ---- ZIP sin dependencias ----
 const CT = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
@@ -263,12 +226,9 @@ function foto() {
   else {
     on('rep', () => { URL.revokeObjectURL(R.pend.url); R.pend = null; foto(); });
     on('ac', async () => {
-      // AQUÍ SE APLICA EL CAMBIO SOLICITADO:
-      // Se genera la subcarpeta y archivo incluyendo: Nivel_Curp_Entrega_Capturista
       const baseName = `${R.nivel}_${R.curp}_${clean(S.entrega)}_${clean(S.capturista)}`;
       const fileName = `${baseName}_${p[0]}.jpg`;
       const name = `${nombreSes()}/${baseName}/${fileName}`;
-      
       await put(name, R.pend.blob); R.pend = null;
       if (R.i + 1 < ps.length) { R.i++; foto(); } else fin();
     });
@@ -277,15 +237,32 @@ function foto() {
 cam.onchange = () => { const f = cam.files[0]; cam.value = ''; if (f) { R.pend = { blob: f, url: URL.createObjectURL(f) }; foto(); } };
 
 async function fin() {
-  app.innerHTML = '<h2>Creando ZIP…</h2><small>Por favor espera un momento.</small>';
-  const pre = nombreSes() + '/', ks = (await keys()).filter(k => k.startsWith(pre)), files = [];
-  for (const k of ks) files.push({ name: k, data: new Uint8Array(await (await get(k)).arrayBuffer()) });
-  const blob = zip(files), fn = nombreSes() + '.zip', file = new File([blob], fn, { type: 'application/zip' }), url = URL.createObjectURL(blob);
+  app.innerHTML = '<h2>Creando ZIP Individual…</h2><small>Por favor espera un momento.</small>';
+  
+  // 1. Calculamos el nombre exacto de la carpeta de ESTA persona
+  const baseName = `${R.nivel}_${R.curp}_${clean(S.entrega)}_${clean(S.capturista)}`;
+  const prefix = `${nombreSes()}/${baseName}/`;
+  
+  // 2. Traemos de la base de datos SOLO los archivos que coincidan con esta persona
+  const ks = (await keys()).filter(k => k.startsWith(prefix));
+  const files = [];
+  
+  for (const k of ks) {
+    // Agregamos al ZIP
+    files.push({ name: k, data: new Uint8Array(await (await get(k)).arrayBuffer()) });
+    // ¡LA MAGIA AQUÍ! Borramos la foto de la memoria/disco para no acumular basura.
+    await del(k); 
+  }
+  
+  // 3. Nombramos el archivo ZIP con el nombre de esta persona
+  const fn = baseName + '.zip';
+  const blob = zip(files), file = new File([blob], fn, { type: 'application/zip' }), url = URL.createObjectURL(blob);
   
   app.innerHTML = `<h2>¡Proceso Completo! 🎉</h2>
   <div class="info-card" style="margin-top:10px;">
     <p><b>${R.nivel}</b> · ${R.curp}</p>
-    <small>📦 Archivos de la sesión de hoy: <b>${files.length} fotos</b> guardadas en ${fn}</small>
+    <small>📦 Archivo individual generado: <b>${files.length} fotos</b> guardadas en ${fn}</small>
+    <small style="color:green; font-weight:bold; margin-top:5px;">✓ Memoria local liberada</small>
   </div>
   ${btn('sh', '📤 COMPARTIR ZIP')}
   <a href="${url}" download="${fn}"><button class="o" style="width:100%">⬇️ DESCARGAR ZIP</button></a>
