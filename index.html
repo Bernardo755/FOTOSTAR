@@ -273,27 +273,30 @@ async function fin() {
     entrega: S.entrega, capturista: S.capturista, fotos: pasos(R.nivel).length, carpeta: persona(), envios: []
   }));
   await escribirTxt();
-  const pre = `${carpeta()}/${persona()}/`;
-  const files = [];
-  for (const k of (await keys()).filter(k => k.startsWith(pre)).sort()) files.push({ name: k, blob: await get(k) });
-  const fn = persona() + '.zip', blob = await zipBlobs(files), url = URL.createObjectURL(blob); U.push(url);
-  const pz = { gs: [persona()], fn };
-  app.innerHTML = `
-    <h2>¡Persona completa! 🎉</h2>
-    <div class="info-card"><p><b>${R.nivel}</b> · ${esc(R.curp)}</p><small style="word-break:break-all">📁 ${esc(persona())}</small>
-    <small id="stp" style="color:#16a34a;font-weight:600"></small></div>
-    <a id="dlp" href="${url}" download="${esc(fn)}"><button>⬇️ DESCARGAR CARPETA ACTUAL</button></a>
-    ${btn('otro', '➕ HACER OTRO REGISTRO')}${btn('dwn', '📁 IR A CARPETA DE DESCARGAS', 'o')}
-    <small>Descarga primero y luego abre Descargas para reenviar el archivo.</small>`;
-  $('#dlp').addEventListener('click', async () => { await marcar(pz); $('#stp').textContent = '✔ Descargada y registrada como enviada'; });
-  on('otro', nivel); on('dwn', abrirDescargas);
+  pantallaDescarga(persona());
 }
 
-function abrirDescargas() {
-  const ua = navigator.userAgent;
-  if (/iPhone|iPad|iPod/.test(ua)) location.href = 'shareddocuments://'; // app Archivos
-  else if (/Android/.test(ua)) location.href = 'intent:#Intent;action=android.intent.action.VIEW_DOWNLOADS;end'; // Descargas
-  else alert('Abre la carpeta Descargas de tu dispositivo.');
+// Descarga obligatoria: no se puede continuar hasta descargar la carpeta recién creada
+async function pantallaDescarga(g) {
+  freeZ();
+  const m = JSON.parse(await get(`~meta/${carpeta()}/${g}`));
+  const pre = `${carpeta()}/${g}/`, files = [];
+  for (const k of (await keys()).filter(k => k.startsWith(pre)).sort()) files.push({ name: k, blob: await get(k) });
+  const fn = g + '.zip', blob = await zipBlobs(files), url = URL.createObjectURL(blob); U.push(url);
+  app.innerHTML = `
+    <h2>Descarga la carpeta para continuar ⬇️</h2>
+    <div class="info-card"><p><b>${esc(m.nivel)}</b> · ${esc(m.curp)}</p><small style="word-break:break-all">📁 ${esc(g)}</small>
+    <small id="stp" style="color:#dc2626;font-weight:600">Pendiente de descargar</small></div>
+    <a id="dlp" href="${url}" download="${esc(fn)}"><button>⬇️ DESCARGAR CARPETA</button></a>
+    ${btn('otro', '➕ HACER OTRO REGISTRO')}${btn('mp', '🏠 MENÚ PRINCIPAL', 'o')}
+    <small>Los botones se activan al descargar.</small>`;
+  $('#otro').disabled = true; $('#mp').disabled = true;
+  $('#dlp').addEventListener('click', async () => {
+    await marcar({ gs: [g], fn });
+    $('#stp').style.color = '#16a34a'; $('#stp').textContent = '✔ Descargada y registrada';
+    $('#otro').disabled = false; $('#mp').disabled = false;
+  });
+  on('otro', nivel); on('mp', home);
 }
 
 // ---- registro y control de envíos ----
@@ -321,17 +324,13 @@ async function marcar(z) {
   }
   await escribirTxt();
 }
-async function compartir(file, ok) {
-  try {
-    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: file.name }); if (ok) await ok(); }
-    else alert('Tu navegador no permite compartir este archivo directamente. Usa DESCARGAR.');
-  } catch (e) { if (e.name !== 'AbortError') alert('No se pudo compartir: ' + e.message + '. Usa DESCARGAR.'); }
-}
-const dl = (id, f) => { const u = URL.createObjectURL(f); U.push(u); return `<a id="${id}" href="${u}" download="${esc(f.name)}"><button class="o">⬇️ DESCARGAR</button></a>`; };
+const dl = (id, f, t) => { const u = URL.createObjectURL(f); U.push(u); return `<a id="${id}" href="${u}" download="${esc(f.name)}"><button class="o">${t}</button></a>`; };
 
 // ---- MENÚ PRINCIPAL ----
 async function home() {
   freeZ();
+  const pd = S ? (await cargarMetas()).find(m => !ultEnvio(m)) : null;
+  if (pd) return pantallaDescarga(pd.carpeta); // descarga pendiente: se obliga antes de continuar
   let ses = '', n = 0;
   if (S) { const ms = await cargarMetas(); n = ms.length; ses = `<div class="info-card"><p>📍 <b>${esc(S.sede)}</b> · ${esc(S.fecha)}</p><p>🗂️ ${n} carpeta(s) · ✅ ${n - ms.filter(m => !ultEnvio(m)).length} enviada(s)</p></div>`; }
   app.innerHTML = `
@@ -361,10 +360,9 @@ async function carpetas() {
     <h3>⏳ Pendientes</h3>${lista(pen, m => `<div>• ${esc(m.carpeta)}</div>`)}
     <h3>✅ Enviadas</h3>${lista(env, m => `<div>• ${esc(m.carpeta)} <small style="display:inline">(${esc(ultEnvio(m).fh)})</small></div>`)}
     <h3>Registro del día</h3>
-    <div class="grid-2">${btn('sht', '📤 TXT')}${dl('dlt', fTxt)}</div><br>
-    <div class="grid-2">${btn('shr', '📤 CSV')}${dl('dlr', fReg)}</div><br>
+    ${dl('dlt', fTxt, '⬇️ DESCARGAR ENVIOS (TXT)')}${dl('dlr', fReg, '⬇️ DESCARGAR REGISTRO (CSV)')}
     ${btn('vol', '🏠 Menú principal', 'o')}`;
-  on('sht', () => compartir(fTxt)); on('shr', () => compartir(fReg)); on('vol', home);
+  on('vol', home);
 }
 
 async function borrarDia() {
@@ -406,13 +404,13 @@ function listo() {
   const tot = Z.reduce((a, z) => a + z.blob.size, 0), np = Z.reduce((a, z) => a + z.n, 0);
   app.innerHTML = `
     <h2>Cierre del día listo ✅</h2>
-    <small>${np} carpeta(s) · ${Z.length} ZIP · ${mb(tot)}. Envía <b>todas</b> las partes. Al compartir o descargar se registran como enviadas en ENVIOS.txt.</small><br>
+    <small>${np} carpeta(s) · ${Z.length} ZIP · ${mb(tot)}. Envía <b>todas</b> las partes. Al descargar se registran como enviadas en ENVIOS.txt.</small><br>
     ${Z.map((z, i) => `<div class="info-card"><p>📦 <b>Parte ${i + 1} de ${Z.length}</b> · ${z.n} carpetas · ${mb(z.blob.size)}</p><small style="word-break:break-all">${esc(z.fn)}</small><small id="st${i}" style="color:#16a34a;font-weight:600"></small><br>
-      ${btn('sh' + i, '📤 COMPARTIR')}<a id="d${i}" href="${z.url}" download="${esc(z.fn)}"><button class="o" style="margin:0">⬇️ DESCARGAR</button></a></div>`).join('')}
-    ${btn('dwn', '📁 IR A CARPETA DE DESCARGAS', 'o')}${btn('vol', '🏠 Menú principal', 'o')}`;
+      <a id="d${i}" href="${z.url}" download="${esc(z.fn)}"><button class="o" style="margin:0">⬇️ DESCARGAR</button></a></div>`).join('')}
+    ${btn('vol', '🏠 Menú principal', 'o')}`;
   const ok = async i => { await marcar(Z[i]); $('#st' + i).textContent = '✔ Registrado como enviado'; };
-  Z.forEach((z, i) => { on('sh' + i, () => compartir(z.file, () => ok(i))); $('#d' + i).addEventListener('click', () => ok(i)); });
-  on('dwn', abrirDescargas); on('vol', home);
+  Z.forEach((z, i) => $('#d' + i).addEventListener('click', () => ok(i)));
+  on('vol', home);
 }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
