@@ -221,27 +221,29 @@ function foto() {
   on('rep', () => { URL.revokeObjectURL(R.pend.url); R.pend = null; foto(); });
   on('ac', async () => {
     $('#ac').disabled = true; // evita doble toque
-    await put(`${carpeta()}/${persona()}/${persona()}_${p[0]}.jpg`, R.pend.blob);
+    const b = await R.pend.prom; // normalmente ya terminó mientras revisabas
+    await put(`${carpeta()}/${persona()}/${persona()}_${p[0]}.jpg`, b);
     URL.revokeObjectURL(R.pend.url); R.pend = null;
     if (R.i + 1 < ps.length) { R.i++; foto(); } else fin();
   });
 }
-const MAXPX = 2000, CALIDAD = 0.85; // ajusta si quieres más/menos peso
+const MAXPX = 2000, CALIDAD = 0.8; // ajusta si quieres más/menos peso
 async function comprimir(f) {
   try {
-    const bm = await createImageBitmap(f);
-    const k = Math.min(1, MAXPX / Math.max(bm.width, bm.height));
-    const c = document.createElement('canvas'); c.width = Math.round(bm.width * k); c.height = Math.round(bm.height * k);
-    c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height); if (bm.close) bm.close();
+    if (f.size < 700000) return f; // ya es liviana
+    // el navegador decodifica ya reducida: mucho más rápido que decodificar completa
+    const bm = await createImageBitmap(f, { resizeWidth: MAXPX, resizeQuality: 'medium' });
+    const c = document.createElement('canvas'); c.width = bm.width; c.height = bm.height;
+    c.getContext('2d').drawImage(bm, 0, 0); if (bm.close) bm.close();
     const b = await new Promise(r => c.toBlob(r, 'image/jpeg', CALIDAD)); c.width = c.height = 0;
     return b && b.size && b.size < f.size ? b : f;
   } catch (e) { return f; }
 }
-cam.onchange = async () => {
+cam.onchange = () => {
   const f = cam.files[0]; cam.value = ''; if (!f) return;
-  app.innerHTML = '<h2>Procesando foto…</h2>';
-  const b = await comprimir(f);
-  R.pend = { blob: b, url: URL.createObjectURL(b) }; foto();
+  // se muestra al instante; la compresión corre en segundo plano mientras revisas la foto
+  R.pend = { blob: f, url: URL.createObjectURL(f), prom: comprimir(f) };
+  foto();
 };
 
 async function fin() {
