@@ -95,6 +95,26 @@ async function zipBlobs(files, prog) { // files: [{name, blob}]
   return new Blob([...parts, ...cd, z], { type: 'application/zip' });
 }
 
+// ---- carpeta real en el dispositivo (solo navegadores con showDirectoryPicker) ----
+let DIR = null;
+const hayDir = () => !!window.showDirectoryPicker;
+async function dirInit() { if (hayDir()) try { DIR = (await get('~dir')) || null; } catch (e) {} }
+async function elegirDir() { DIR = await showDirectoryPicker({ mode: 'readwrite' }); await put('~dir', DIR); }
+async function permisoDir() {
+  if (!DIR) return false;
+  try { if ((await DIR.queryPermission({ mode: 'readwrite' })) === 'granted') return true; return (await DIR.requestPermission({ mode: 'readwrite' })) === 'granted'; } catch (e) { return false; }
+}
+async function escribirDir(path, blob) { // path: carpetaDia/persona/archivo
+  if (!DIR || !(await permisoDir())) return;
+  try {
+    const p = path.split('/'); let d = DIR;
+    for (const x of p.slice(0, -1)) d = await d.getDirectoryHandle(x, { create: true });
+    const w = await (await d.getFileHandle(p[p.length - 1], { create: true })).createWritable();
+    await w.write(blob); await w.close();
+  } catch (e) { console.error(e); }
+}
+const escribirTxt = async () => escribirDir(carpeta() + '/ENVIOS.txt', new Blob([txtDe(await cargarMetas())], { type: 'text/plain' }));
+
 // ---- estado ----
 let S = JSON.parse(localStorage.sesion || 'null');
 let R = { nivel: '', curp: '', i: 0, pend: null, stamp: '' };
@@ -221,7 +241,8 @@ function foto() {
   on('ac', async () => {
     $('#ac').disabled = true; // evita doble toque
     const b = await R.pend.prom; // normalmente ya terminó mientras revisabas
-    await put(`${carpeta()}/${persona()}/${persona()}_${p[0]}.jpg`, b);
+    const kk = `${carpeta()}/${persona()}/${persona()}_${p[0]}.jpg`;
+    await put(kk, b); await escribirDir(kk, b); // también a la carpeta real si hay una elegida
     URL.revokeObjectURL(R.pend.url); R.pend = null;
     if (R.i + 1 < ps.length) { R.i++; foto(); } else fin();
   });
@@ -251,6 +272,7 @@ async function fin() {
     sede: S.sede, fechaHora: new Date().toLocaleString('sv'), nivel: R.nivel, curp: R.curp,
     entrega: S.entrega, capturista: S.capturista, fotos: pasos(R.nivel).length, carpeta: persona(), envios: []
   }));
+  await escribirTxt();
   const pre = `${carpeta()}/${persona()}/`;
   const files = [];
   for (const k of (await keys()).filter(k => k.startsWith(pre)).sort()) files.push({ name: k, blob: await get(k) });
@@ -297,6 +319,7 @@ async function marcar(z) {
     const m = JSON.parse(v); m.envios = m.envios || []; m.envios.push({ fh: new Date().toLocaleString('sv'), archivo: z.fn });
     await put(k, JSON.stringify(m));
   }
+  await escribirTxt();
 }
 async function compartir(file, ok) {
   try {
@@ -315,10 +338,12 @@ async function home() {
     <h2>Captura Fotos</h2><small>Menú principal</small><br>${ses}
     ${btn('ns', '▶️ INICIAR NUEVA SESIÓN')}
     ${vigente() ? btn('cs', '↩️ CONTINUAR SESIÓN DE HOY', 'o') : ''}
+    ${hayDir() ? btn('dir', DIR ? `📂 Guardando en: ${esc(DIR.name)} (cambiar)` : '📂 ELEGIR CARPETA DE GUARDADO', 'o') : ''}
     ${S ? btn('vc', '🗂️ VER CARPETAS CREADAS', 'o') : ''}
     ${n ? btn('cd', '📦 ENVIAR CIERRE DEL DÍA') : ''}
     ${n ? btn('bd', '🗑️ BORRAR CARPETA DEL DÍA', 'r') : ''}`;
   on('ns', setup);
+  if (hayDir()) on('dir', async () => { try { await elegirDir(); home(); } catch (e) {} });
   if (vigente()) on('cs', nivel);
   if (S) on('vc', carpetas);
   if (n) { on('cd', enviarDia); on('bd', borrarDia); }
@@ -392,7 +417,7 @@ function listo() {
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
-home();
+dirInit().finally(home);
 </script>
 </body>
 </html>
