@@ -104,7 +104,8 @@ const vigente = () => S && S.creadoEl == today();
 const carpeta = () => S.carpeta || (clean(S.sede) + '_' + S.fecha); // carpeta del día
 const persona = () => `${R.nivel}_${R.curp}_${R.stamp}_${clean(S.capturista)}`; // carpeta por persona
 const stopCam = () => { clearInterval(timer); if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; };
-const freeZ = () => { if (Z) Z.forEach(z => URL.revokeObjectURL(z.url)); Z = null; };
+let U = [];
+const freeZ = () => { if (Z) Z.forEach(z => URL.revokeObjectURL(z.url)); Z = null; U.forEach(u => URL.revokeObjectURL(u)); U = []; };
 const go = (f, ...a) => { stopCam(); app.innerHTML = ''; f(...a); };
 const btn = (id, t, o) => `<button id="${id}" ${o ? `class="${o}"` : ''}>${t}</button>`;
 const on = (id, f) => $('#' + id).onclick = f;
@@ -112,19 +113,20 @@ const metaKeys = async () => (await keys()).filter(k => k.startsWith('~meta/' + 
 
 function setup() {
   app.innerHTML = `
-    <h2>${vigente() ? 'Editar Configuración' : 'Nueva Sesión'}</h2>
+    <h2>Nueva Sesión</h2>
     <div class="input-group"><small>Sede (nombre de la carpeta)</small><input id="sede" placeholder="Ej. CDMX Centro" value="${esc(S?.sede)}"></div>
     <div class="input-group"><small>Quién entrega</small><input id="ent" placeholder="Ej. Juan Pérez" value="${esc(S?.entrega)}"></div>
     <div class="input-group"><small>Capturista</small><input id="cap" placeholder="Ej. María López" value="${esc(S?.capturista)}"></div>
-    <div class="input-group"><small>Fecha de sesión</small><input id="fec" type="date" value="${vigente() ? S.fecha : today()}"></div>
-    <br>${btn('ok', vigente() ? 'GUARDAR CAMBIOS' : 'CREAR CARPETA DEL DÍA')}${vigente() ? btn('cx', 'Cancelar', 'o') : ''}`;
-  if (vigente()) on('cx', nivel);
-  on('ok', () => {
+    <div class="input-group"><small>Fecha de sesión</small><input id="fec" type="date" value="${today()}"></div>
+    <br>${btn('ok', 'CREAR CARPETA DEL DÍA')}${btn('cx', 'Cancelar', 'o')}`;
+  on('cx', home);
+  on('ok', async () => {
     const v = i => $('#' + i).value.trim();
     if (!v('sede') || !v('cap') || !v('ent') || !v('fec')) return alert('Llena todos los campos');
-    const prev = vigente() && S.carpeta ? S.carpeta : (vigente() ? carpeta() : null); // la carpeta del día no cambia al editar
-    S = { sede: v('sede'), capturista: v('cap'), entrega: v('ent'), fecha: v('fec'), creadoEl: today() };
-    S.carpeta = prev || (clean(S.sede) + '_' + S.fecha);
+    const nueva = clean(v('sede')) + '_' + v('fec');
+    if (S && carpeta() !== nueva && (await keys()).some(k => k.startsWith(carpeta() + '/'))) // evita dejar fotos huérfanas
+      return alert(`Aún tienes evidencia de ${carpeta()} en el teléfono. Primero envía el cierre del día y bórrala desde el menú principal.`);
+    S = { sede: v('sede'), capturista: v('cap'), entrega: v('ent'), fecha: v('fec'), creadoEl: today(), carpeta: nueva };
     localStorage.sesion = JSON.stringify(S);
     nivel();
   });
@@ -133,7 +135,7 @@ function setup() {
 async function nivel() {
   freeZ();
   R = { nivel: '', curp: '', i: 0, pend: null, stamp: '' };
-  const n = (await metaKeys()).length;
+  const ms = await cargarMetas(), n = ms.length, pen = ms.filter(m => !ultEnvio(m)).length;
   const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
   app.innerHTML = `
     <div class="info-card">
@@ -141,17 +143,14 @@ async function nivel() {
       <p>👤 Capturista: <b>${esc(S.capturista)}</b></p>
       <p>📦 Entrega: <b>${esc(S.entrega)}</b></p>
       <p>📅 Fecha: ${esc(S.fecha)}</p>
-      <p>🗂️ Personas capturadas hoy: <b>${n}</b></p>
+      <p>🗂️ Personas hoy: <b>${n}</b> · ✅ Enviadas: <b>${n - pen}</b> · ⏳ Pendientes: <b>${pen}</b></p>
       ${est ? `<p>💾 Almacenado en el teléfono: <b>${mb(est.usage || 0)}</b></p>` : ''}
     </div>
     <h3>Selecciona el nivel educativo</h3>
     ${['BASICA', 'EMS', 'JEF'].map(x => btn('n' + x, x)).join('')}
-    <br>
-    ${n ? btn('dia', '📦 ENVIAR EVIDENCIA DEL DÍA') : ''}
-    ${btn('nuevo', 'EDITAR DATOS / NUEVA SESIÓN', 'o')}`;
+    <br>${btn('mp', '🏠 MENÚ PRINCIPAL', 'o')}`;
   ['BASICA', 'EMS', 'JEF'].forEach(x => on('n' + x, () => { R.nivel = x; eleccion(); }));
-  on('nuevo', setup);
-  if (n) on('dia', enviarDia);
+  on('mp', home);
 }
 
 function eleccion() {
@@ -247,32 +246,118 @@ cam.onchange = () => {
 };
 
 async function fin() {
+  freeZ();
   await put(`~meta/${carpeta()}/${persona()}`, JSON.stringify({
     sede: S.sede, fechaHora: new Date().toLocaleString('sv'), nivel: R.nivel, curp: R.curp,
-    entrega: S.entrega, capturista: S.capturista, fotos: pasos(R.nivel).length, carpeta: persona()
+    entrega: S.entrega, capturista: S.capturista, fotos: pasos(R.nivel).length, carpeta: persona(), envios: []
   }));
-  const n = (await metaKeys()).length;
+  const pre = `${carpeta()}/${persona()}/`;
+  const files = [];
+  for (const k of (await keys()).filter(k => k.startsWith(pre)).sort()) files.push({ name: k, blob: await get(k) });
+  const fn = persona() + '.zip', blob = await zipBlobs(files), url = URL.createObjectURL(blob); U.push(url);
+  const pz = { gs: [persona()], fn };
   app.innerHTML = `
     <h2>¡Persona completa! 🎉</h2>
-    <div class="info-card"><p><b>${R.nivel}</b> · ${esc(R.curp)}</p>
-    <small>Guardada en la carpeta del día. Llevas <b>${n}</b> persona(s) hoy.</small></div>
-    <h3>¿Quieres enviar la evidencia del día?</h3>
-    ${btn('si', '📦 SÍ, ENVIAR EVIDENCIA DEL DÍA')}${btn('sig', 'NO, SIGUIENTE PERSONA', 'o')}`;
-  on('si', enviarDia); on('sig', nivel);
+    <div class="info-card"><p><b>${R.nivel}</b> · ${esc(R.curp)}</p><small style="word-break:break-all">📁 ${esc(persona())}</small>
+    <small id="stp" style="color:#16a34a;font-weight:600"></small></div>
+    <a id="dlp" href="${url}" download="${esc(fn)}"><button>⬇️ DESCARGAR CARPETA ACTUAL</button></a>
+    ${btn('otro', '➕ HACER OTRO REGISTRO')}${btn('dwn', '📁 IR A CARPETA DE DESCARGAS', 'o')}
+    <small>Descarga primero y luego abre Descargas para reenviar el archivo.</small>`;
+  $('#dlp').addEventListener('click', async () => { await marcar(pz); $('#stp').textContent = '✔ Descargada y registrada como enviada'; });
+  on('otro', nivel); on('dwn', abrirDescargas);
 }
 
-const LIM = 500 * 1048576; // tamaño máximo por parte (~500 MB)
+function abrirDescargas() {
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/.test(ua)) location.href = 'shareddocuments://'; // app Archivos
+  else if (/Android/.test(ua)) location.href = 'intent:#Intent;action=android.intent.action.VIEW_DOWNLOADS;end'; // Descargas
+  else alert('Abre la carpeta Descargas de tu dispositivo.');
+}
+
+// ---- registro y control de envíos ----
+const ultEnvio = m => m.envios && m.envios.length ? m.envios[m.envios.length - 1] : null;
+async function cargarMetas() {
+  const o = [];
+  for (const k of await metaKeys()) { const m = JSON.parse(await get(k)); m._k = k; o.push(m); }
+  return o.sort((x, y) => x.fechaHora < y.fechaHora ? -1 : 1);
+}
+const csvDe = ms => '\ufeff' + [['sede', 'fecha_hora', 'nivel', 'curp', 'entrega', 'capturista', 'fotos', 'carpeta', 'estado_envio', 'fecha_envio']]
+  .concat(ms.map(m => { const e = ultEnvio(m); return [m.sede, m.fechaHora, m.nivel, m.curp, m.entrega, m.capturista, m.fotos, m.carpeta, e ? 'ENVIADA' : 'PENDIENTE', e ? e.fh : '']; }))
+  .map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+const txtDe = ms => {
+  const env = ms.filter(ultEnvio), pen = ms.filter(m => !ultEnvio(m));
+  return `CONTROL DE ENVÍOS - ${S.sede} - ${S.fecha}\r\nCapturista: ${S.capturista} | Entrega: ${S.entrega}\r\nGenerado: ${new Date().toLocaleString('sv')}\r\nTotal: ${ms.length} | Enviadas: ${env.length} | Pendientes: ${pen.length}\r\n\r\n` +
+    `=== PENDIENTES (${pen.length}) ===\r\n${pen.map(m => `- ${m.carpeta}  (capturada ${m.fechaHora})`).join('\r\n')}\r\n\r\n` +
+    `=== ENVIADAS (${env.length}) ===\r\n${env.map(m => `- ${m.carpeta}  | enviada ${ultEnvio(m).fh} | ${ultEnvio(m).archivo}`).join('\r\n')}\r\n`;
+};
+async function marcar(z) {
+  if (z.marcada) return; z.marcada = true;
+  for (const g of z.gs) {
+    const k = `~meta/${carpeta()}/${g}`, v = await get(k); if (!v) continue;
+    const m = JSON.parse(v); m.envios = m.envios || []; m.envios.push({ fh: new Date().toLocaleString('sv'), archivo: z.fn });
+    await put(k, JSON.stringify(m));
+  }
+}
+async function compartir(file, ok) {
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: file.name }); if (ok) await ok(); }
+    else alert('Tu navegador no permite compartir este archivo directamente. Usa DESCARGAR.');
+  } catch (e) { if (e.name !== 'AbortError') alert('No se pudo compartir: ' + e.message + '. Usa DESCARGAR.'); }
+}
+const dl = (id, f) => { const u = URL.createObjectURL(f); U.push(u); return `<a id="${id}" href="${u}" download="${esc(f.name)}"><button class="o">⬇️ DESCARGAR</button></a>`; };
+
+// ---- MENÚ PRINCIPAL ----
+async function home() {
+  freeZ();
+  let ses = '', n = 0;
+  if (S) { const ms = await cargarMetas(); n = ms.length; ses = `<div class="info-card"><p>📍 <b>${esc(S.sede)}</b> · ${esc(S.fecha)}</p><p>🗂️ ${n} carpeta(s) · ✅ ${n - ms.filter(m => !ultEnvio(m)).length} enviada(s)</p></div>`; }
+  app.innerHTML = `
+    <h2>Captura Fotos</h2><small>Menú principal</small><br>${ses}
+    ${btn('ns', '▶️ INICIAR NUEVA SESIÓN')}
+    ${vigente() ? btn('cs', '↩️ CONTINUAR SESIÓN DE HOY', 'o') : ''}
+    ${S ? btn('vc', '🗂️ VER CARPETAS CREADAS', 'o') : ''}
+    ${n ? btn('cd', '📦 ENVIAR CIERRE DEL DÍA') : ''}
+    ${n ? btn('bd', '🗑️ BORRAR CARPETA DEL DÍA', 'r') : ''}`;
+  on('ns', setup);
+  if (vigente()) on('cs', nivel);
+  if (S) on('vc', carpetas);
+  if (n) { on('cd', enviarDia); on('bd', borrarDia); }
+}
+
+async function carpetas() {
+  freeZ();
+  const ms = await cargarMetas(), pen = ms.filter(m => !ultEnvio(m)), env = ms.filter(ultEnvio), st = stamp();
+  const fReg = new File([csvDe(ms)], `REGISTRO_${carpeta()}_${st}.csv`, { type: 'text/csv' });
+  const fTxt = new File([txtDe(ms)], `ENVIOS_${carpeta()}_${st}.txt`, { type: 'text/plain' });
+  const lista = (arr, f) => `<div style="max-height:200px;overflow:auto;font-size:13px;color:var(--text-sec);margin-bottom:8px">${arr.length ? arr.map(f).join('') : '<i>Ninguna</i>'}</div>`;
+  app.innerHTML = `
+    <h2>Carpetas creadas</h2>
+    <small>📅 ${esc(S.fecha)} · ${ms.length} carpeta(s) · ✅ <b>${env.length} enviadas</b> · ⏳ ${pen.length} pendientes</small>
+    <h3>⏳ Pendientes</h3>${lista(pen, m => `<div>• ${esc(m.carpeta)}</div>`)}
+    <h3>✅ Enviadas</h3>${lista(env, m => `<div>• ${esc(m.carpeta)} <small style="display:inline">(${esc(ultEnvio(m).fh)})</small></div>`)}
+    <h3>Registro del día</h3>
+    <div class="grid-2">${btn('sht', '📤 TXT')}${dl('dlt', fTxt)}</div><br>
+    <div class="grid-2">${btn('shr', '📤 CSV')}${dl('dlr', fReg)}</div><br>
+    ${btn('vol', '🏠 Menú principal', 'o')}`;
+  on('sht', () => compartir(fTxt)); on('shr', () => compartir(fReg)); on('vol', home);
+}
+
+async function borrarDia() {
+  const ms = await cargarMetas(), pen = ms.filter(m => !ultEnvio(m)).length;
+  if (!confirm((pen ? `⚠️ Hay ${pen} carpeta(s) SIN marcar como enviadas.\n\n` : '') + `¿Borrar del teléfono TODA la carpeta del día (${carpeta()})? Hazlo solo si ya enviaste el cierre.`)) return;
+  for (const k of await keys()) if (k.startsWith(carpeta() + '/') || k.startsWith('~meta/' + carpeta() + '/')) await del(k);
+  alert('Carpeta del día borrada.'); home();
+}
+
+// ---- CIERRE DEL DÍA: ZIP de toda la carpeta (en partes de ~500 MB) + ENVIOS.txt ----
+const LIM = 500 * 1048576;
 async function enviarDia() {
   freeZ();
-  app.innerHTML = `<h2>Armando ZIP del día…</h2><small id="pg">Preparando…</small><small>No cierres esta pantalla.</small>`;
+  app.innerHTML = `<h2>Armando cierre del día…</h2><small id="pg">Preparando…</small><small>No cierres esta pantalla.</small>`;
   try {
-    const pre = carpeta() + '/';
-    const ks = (await keys()).filter(k => k.startsWith(pre)).sort();
-    if (!ks.length) { alert('No hay fotos guardadas hoy.'); return nivel(); }
-    const metas = {};
-    for (const k of await metaKeys()) { const m = JSON.parse(await get(k)); metas[m.carpeta] = m; }
-    const grupos = {}; // una entrada por persona (carpeta CURP): nunca se parte una persona entre dos ZIP
-    for (const k of ks) (grupos[k.split('/')[1]] = grupos[k.split('/')[1]] || []).push({ name: k, blob: await get(k) });
+    const pre = carpeta() + '/', ms = await cargarMetas(), grupos = {};
+    for (const k of (await keys()).filter(k => k.startsWith(pre)).sort()) (grupos[k.split('/')[1]] = grupos[k.split('/')[1]] || []).push({ name: k, blob: await get(k) });
+    if (!Object.keys(grupos).length) { alert('No hay carpetas para enviar.'); return home(); }
     const partes = []; let cur = null;
     for (const g of Object.keys(grupos)) {
       const sz = grupos[g].reduce((a, f) => a + f.blob.size, 0);
@@ -281,46 +366,33 @@ async function enviarDia() {
     }
     const st = stamp(); Z = [];
     for (let p = 0; p < partes.length; p++) {
-      const files = [], rows = ['sede,fecha_hora,nivel,curp,entrega,capturista,fotos,carpeta'];
-      for (const g of partes[p].gs) {
-        files.push(...grupos[g]); const m = metas[g];
-        if (m) rows.push([m.sede, m.fechaHora, m.nivel, m.curp, m.entrega, m.capturista, m.fotos, m.carpeta].map(x => `"${String(x).replace(/"/g, '""')}"`).join(','));
-      }
-      files.push({ name: pre + 'REGISTRO.csv', blob: new Blob(['\ufeff' + rows.join('\r\n')], { type: 'text/csv' }) });
-      const fn = `EVIDENCIA_${carpeta()}_${st}_PARTE_${p + 1}-de-${partes.length}.zip`;
+      const files = []; partes[p].gs.forEach(g => files.push(...grupos[g]));
+      files.push({ name: pre + 'ENVIOS.txt', blob: new Blob([txtDe(ms)], { type: 'text/plain' }) }); // en la carpeta principal del día
+      files.push({ name: pre + 'CONCENTRADO_DIA.csv', blob: new Blob([csvDe(ms)], { type: 'text/csv' }) });
+      const fn = `CIERRE_${carpeta()}_${st}_PARTE_${p + 1}-de-${partes.length}.zip`;
       const blob = await zipBlobs(files, (i, t) => { $('#pg').textContent = `Parte ${p + 1} de ${partes.length}: archivo ${i} de ${t}…`; });
-      Z.push({ blob, fn, url: URL.createObjectURL(blob), file: new File([blob], fn, { type: 'application/zip' }), n: partes[p].gs.length });
+      Z.push({ blob, fn, gs: partes[p].gs, url: URL.createObjectURL(blob), file: new File([blob], fn, { type: 'application/zip' }), n: partes[p].gs.length });
     }
     listo();
-  } catch (e) { alert('Error: ' + e.message); nivel(); }
+  } catch (e) { alert('Error: ' + e.message); home(); }
 }
 
 function listo() {
   const tot = Z.reduce((a, z) => a + z.blob.size, 0), np = Z.reduce((a, z) => a + z.n, 0);
   app.innerHTML = `
-    <h2>Evidencia lista ✅</h2>
-    <small>${np} persona(s) · ${Z.length} ZIP · ${mb(tot)} en total. Envía <b>todas</b> las partes. Cada una trae su REGISTRO.csv.</small><br>
-    ${Z.map((z, i) => `<div class="info-card"><p>📦 <b>Parte ${i + 1} de ${Z.length}</b> · ${z.n} personas · ${mb(z.blob.size)}</p><small style="word-break:break-all">${esc(z.fn)}</small><br>
-      ${btn('sh' + i, '📤 COMPARTIR')}<a href="${z.url}" download="${esc(z.fn)}"><button class="o" style="margin:0">⬇️ DESCARGAR</button></a></div>`).join('')}
-    <small>Si descargas, los archivos quedan en <b>Descargas</b> (iPhone: Archivos › Descargas) y de ahí los reenvías por donde quieras.</small><br>
-    ${btn('bor', '🗑️ YA ENVIÉ TODAS LAS PARTES: BORRAR DEL DÍA', 'r')}${btn('vol', 'Volver (conservar fotos)', 'o')}`;
-  Z.forEach((z, i) => on('sh' + i, async () => {
-    try {
-      if (navigator.canShare && navigator.canShare({ files: [z.file] })) await navigator.share({ files: [z.file], title: z.fn });
-      else alert('Tu navegador no permite compartir este ZIP directamente. Usa DESCARGAR.');
-    } catch (e) { if (e.name !== 'AbortError') alert('No se pudo compartir: ' + e.message + '. Usa DESCARGAR.'); }
-  }));
-  on('vol', nivel);
-  on('bor', async () => {
-    if (!confirm(`¿Seguro? Se borrarán del teléfono TODAS las fotos del día. Hazlo solo si ya enviaste o descargaste las ${Z.length} parte(s).`)) return;
-    for (const k of await keys()) if (k.startsWith(carpeta() + '/') || k.startsWith('~meta/' + carpeta() + '/')) await del(k);
-    alert('Evidencia del día borrada.'); nivel();
-  });
+    <h2>Cierre del día listo ✅</h2>
+    <small>${np} carpeta(s) · ${Z.length} ZIP · ${mb(tot)}. Envía <b>todas</b> las partes. Al compartir o descargar se registran como enviadas en ENVIOS.txt.</small><br>
+    ${Z.map((z, i) => `<div class="info-card"><p>📦 <b>Parte ${i + 1} de ${Z.length}</b> · ${z.n} carpetas · ${mb(z.blob.size)}</p><small style="word-break:break-all">${esc(z.fn)}</small><small id="st${i}" style="color:#16a34a;font-weight:600"></small><br>
+      ${btn('sh' + i, '📤 COMPARTIR')}<a id="d${i}" href="${z.url}" download="${esc(z.fn)}"><button class="o" style="margin:0">⬇️ DESCARGAR</button></a></div>`).join('')}
+    ${btn('dwn', '📁 IR A CARPETA DE DESCARGAS', 'o')}${btn('vol', '🏠 Menú principal', 'o')}`;
+  const ok = async i => { await marcar(Z[i]); $('#st' + i).textContent = '✔ Registrado como enviado'; };
+  Z.forEach((z, i) => { on('sh' + i, () => compartir(z.file, () => ok(i))); $('#d' + i).addEventListener('click', () => ok(i)); });
+  on('dwn', abrirDescargas); on('vol', home);
 }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
-vigente() ? nivel() : setup();
+home();
 </script>
 </body>
 </html>
